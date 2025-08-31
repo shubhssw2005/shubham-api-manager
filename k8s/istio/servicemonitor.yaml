@@ -1,0 +1,50 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: api-service-metrics
+  namespace: production
+  labels:
+    app.kubernetes.io/name: api-service
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api-service
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: media-service-metrics
+  namespace: production
+  labels:
+    app.kubernetes.io/name: media-service
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: media-service
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: worker-service-metrics
+  namespace: production
+  labels:
+    app.kubernetes.io/name: worker-service
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: worker-service
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s

@@ -1,0 +1,62 @@
+# Common Helm values for autoscaling components
+
+# AWS Configuration
+aws:
+  region: us-east-1
+  accountId: ""
+
+# Cluster Configuration
+clusterName: ""
+
+# Autoscaling Configuration
+autoscaling:
+  # Cluster Autoscaler
+  clusterAutoscaler:
+    enabled: true
+    image: k8s.gcr.io/autoscaling/cluster-autoscaler
+    tag: v1.21.0
+    scaleDownEnabled: true
+    scaleDownDelayAfterAdd: 10m
+    scaleDownUnneededTime: 10m
+    scaleDownUtilizationThreshold: 0.5
+    maxNodeProvisionTime: 15m
+    scanInterval: 10s
+    serviceAccount:
+      roleArn: ""
+
+  # Vertical Pod Autoscaler
+  verticalPodAutoscaler:
+    enabled: true
+    
+    # VPA Admission Controller
+    admissionController:
+      image: k8s.gcr.io/autoscaling/vpa-admission-controller
+      tag: 0.13.0
+    
+    # VPA Recommender
+    recommender:
+      image: k8s.gcr.io/autoscaling/vpa-recommender
+      tag: 0.13.0
+      minCpuMillicores: 25
+      minMemoryMb: 100
+      targetCpuPercentile: 0.9
+      recommendationMarginFraction: 0.15
+      checkpointsTimeout: 10m
+    
+    # VPA Updater
+    updater:
+      image: k8s.gcr.io/autoscaling/vpa-updater
+      tag: 0.13.0
+      minReplicas: 2
+      evictionTolerance: 0.5
+      evictionsPerInterval: 1
+      evictionRateBurst: 1
+
+# Resource Limits
+resources:
+  limits:
+    cpu: 100m
+    memory: 600Mi
+  requests:
+    cpu: 100m
+    memory: 600Mi

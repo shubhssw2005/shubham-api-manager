@@ -1,0 +1,40 @@
+{
+  "api_v1": {
+    "pattern": "^/api/v1/.*",
+    "target_service": "ultra-cpp-api",
+    "priority": 100,
+    "weight": 1.0,
+    "enabled": true,
+    "headers": {
+      "X-Service": "ultra-cpp",
+      "X-Version": "1.0"
+    }
+  },
+  "media_processing": {
+    "pattern": "^/api/media/.*",
+    "target_service": "ultra-cpp-media",
+    "priority": 90,
+    "weight": 1.0,
+    "enabled": true,
+    "headers": {
+      "X-Service": "ultra-cpp-media"
+    }
+  },
+  "cache_endpoints": {
+    "pattern": "^/api/cache/.*",
+    "target_service": "ultra-cpp-cache",
+    "priority": 95,
+    "weight": 1.0,
+    "enabled": true
+  },
+  "fallback": {
+    "pattern": ".*",
+    "target_service": "nodejs-backend",
+    "priority": 1,
+    "weight": 1.0,
+    "enabled": true,
+    "headers": {
+      "X-Fallback": "true"
+    }
+  }
+}

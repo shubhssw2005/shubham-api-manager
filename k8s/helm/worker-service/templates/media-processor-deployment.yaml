@@ -1,0 +1,96 @@
+{{- if .Values.workers.media-processor.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "worker-service.fullname" . }}-media-processor
+  labels:
+    {{- include "worker-service.labels" . | nindent 4 }}
+    app.kubernetes.io/component: media-processor
+spec:
+  {{- if not .Values.workers.media-processor.autoscaling.enabled }}
+  replicas: {{ .Values.workers.media-processor.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "worker-service.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: media-processor
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "{{ .Values.istio.enabled }}"
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
+      labels:
+        {{- include "worker-service.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: media-processor
+        version: {{ .Values.workers.media-processor.image.tag | default .Chart.AppVersion }}
+    spec:
+      serviceAccountName: {{ include "worker-service.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: media-processor
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.workers.media-processor.image.repository }}:{{ .Values.workers.media-processor.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: IfNotPresent
+          env:
+            {{- toYaml .Values.env | nindent 12 }}
+            - name: WORKER_TYPE
+              value: "media-processor"
+            - name: SQS_QUEUE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: worker-config
+                  key: media-processing-queue-url
+          resources:
+            {{- toYaml .Values.workers.media-processor.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: processing
+              mountPath: /app/processing
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "pgrep -f media-processor"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "pgrep -f media-processor"
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: processing
+          emptyDir:
+            sizeLimit: 20Gi
+      {{- with .Values.workers.media-processor.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.workers.media-processor.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                  - media-processor
+              topologyKey: kubernetes.io/hostname
+{{- end }}

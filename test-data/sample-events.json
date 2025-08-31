@@ -1,0 +1,34 @@
+{
+  "events": [
+    {
+      "id": "evt_001",
+      "type": "user_action",
+      "timestamp": "2025-01-27T10:30:00Z",
+      "data": {
+        "action": "page_view",
+        "page": "/api/posts",
+        "user_id": "user_123"
+      }
+    },
+    {
+      "id": "evt_002", 
+      "type": "api_call",
+      "timestamp": "2025-01-27T10:30:01Z",
+      "data": {
+        "endpoint": "/api/media/upload",
+        "method": "POST",
+        "response_time": 150
+      }
+    },
+    {
+      "id": "evt_003",
+      "type": "system_event", 
+      "timestamp": "2025-01-27T10:30:02Z",
+      "data": {
+        "event": "cache_miss",
+        "key": "posts_list",
+        "latency": 25
+      }
+    }
+  ]
+}

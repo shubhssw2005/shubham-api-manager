@@ -1,0 +1,13 @@
+{
+  "name": "jwt-authorizer",
+  "version": "1.0.0",
+  "description": "JWT Authorizer Lambda for API Gateway with rate limiting",
+  "main": "index.js",
+  "dependencies": {
+    "jsonwebtoken": "^9.0.2",
+    "ioredis": "^5.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

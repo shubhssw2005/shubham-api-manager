@@ -1,0 +1,127 @@
+version: '3.8'
+
+services:
+  media-processor:
+    build:
+      context: .
+      dockerfile: docker/media-processor.Dockerfile
+    container_name: media-processor
+    restart: unless-stopped
+    environment:
+      # AWS Configuration
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      
+      # S3 Configuration
+      - MEDIA_BUCKET=${MEDIA_BUCKET}
+      - S3_BACKUP_BUCKET=${S3_BACKUP_BUCKET}
+      
+      # SQS Configuration
+      - MEDIA_PROCESSING_QUEUE_URL=${MEDIA_PROCESSING_QUEUE_URL}
+      - MEDIA_DLQ_URL=${MEDIA_DLQ_URL}
+      
+      # SNS Configuration (optional)
+      - MEDIA_PROCESSING_TOPIC_ARN=${MEDIA_PROCESSING_TOPIC_ARN}
+      
+      # Redis Configuration
+      - REDIS_URL=${REDIS_URL}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_DB=${REDIS_DB:-0}
+      
+      # Processing Configuration
+      - MEDIA_PROCESSOR_CONCURRENCY=${MEDIA_PROCESSOR_CONCURRENCY:-5}
+      - MAX_PROCESSING_RETRIES=${MAX_PROCESSING_RETRIES:-3}
+      - PROCESSING_TIMEOUT=${PROCESSING_TIMEOUT:-300000}
+      - POLL_INTERVAL=${POLL_INTERVAL:-1000}
+      - SQS_VISIBILITY_TIMEOUT=${SQS_VISIBILITY_TIMEOUT:-300}
+      - SQS_BATCH_SIZE=${SQS_BATCH_SIZE:-10}
+      
+      # Job Configuration
+      - JOB_STATUS_TTL=${JOB_STATUS_TTL:-604800}
+      - METRICS_REPORT_INTERVAL=${METRICS_REPORT_INTERVAL:-60000}
+      
+      # Feature Flags
+      - ENABLE_HLS_TRANSCODING=${ENABLE_HLS_TRANSCODING:-false}
+      
+      # Node.js Configuration
+      - NODE_ENV=${NODE_ENV:-production}
+      - NODE_OPTIONS=--max-old-space-size=2048
+    
+    volumes:
+      # Mount temp directory for processing
+      - media-processing-temp:/tmp/media-processing
+      
+      # Mount logs directory (optional)
+      - ./logs:/app/logs
+    
+    networks:
+      - media-processing-network
+    
+    depends_on:
+      - redis
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Redis for job status tracking
+  redis:
+    image: redis:7-alpine
+    container_name: media-processor-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - media-processing-network
+    ports:
+      - "6379:6379"
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  # Optional: Redis Commander for debugging
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: redis-commander
+    restart: unless-stopped
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    networks:
+      - media-processing-network
+    depends_on:
+      - redis
+    profiles:
+      - debug
+
+volumes:
+  media-processing-temp:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  media-processing-network:
+    driver: bridge

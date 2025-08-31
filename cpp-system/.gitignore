@@ -1,0 +1,49 @@
+# Build directories
+build/
+cmake-build-*/
+
+# Conan files
+conandata.yml
+conaninfo.txt
+conanbuildinfo.*
+conan.lock
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Compiled binaries
+*.o
+*.so
+*.a
+*.exe
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Cache files
+*.cache
+*.mmap
+
+# Core dumps
+core.*
+
+# Performance profiling files
+*.prof
+perf.data*
+callgrind.out.*
+
+# CUDA compiled files
+*.cubin
+*.ptx
+
+# System files
+.DS_Store
+Thumbs.db

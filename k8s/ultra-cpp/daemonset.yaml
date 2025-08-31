@@ -1,0 +1,141 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ultra-cpp-gateway
+  namespace: ultra-cpp
+  labels:
+    app: ultra-cpp-gateway
+    component: api-gateway
+    version: v1.0.0
+spec:
+  selector:
+    matchLabels:
+      app: ultra-cpp-gateway
+  template:
+    metadata:
+      labels:
+        app: ultra-cpp-gateway
+        component: api-gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      hostNetwork: true  # Required for DPDK kernel bypass
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        ultra-cpp.io/dpdk-enabled: "true"
+        kubernetes.io/arch: amd64
+      tolerations:
+      - key: ultra-cpp.io/dedicated
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+      containers:
+      - name: ultra-cpp-gateway
+        image: ultra-cpp/gateway:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        - containerPort: 8081
+          name: health
+          protocol: TCP
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: DPDK_ENABLED
+          value: "true"
+        - name: WORKER_THREADS
+          value: "4"
+        - name: MEMORY_POOL_SIZE
+          value: "2147483648"  # 2GB
+        - name: FALLBACK_UPSTREAM
+          value: "http://nodejs-api:3005"
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "4"
+            hugepages-2Mi: "2Gi"
+            ultra-cpp.io/dpdk-ports: "2"
+          limits:
+            memory: "8Gi"
+            cpu: "8"
+            hugepages-2Mi: "4Gi"
+            ultra-cpp.io/dpdk-ports: "2"
+        securityContext:
+          privileged: true  # Required for DPDK hardware access
+          capabilities:
+            add:
+            - IPC_LOCK
+            - SYS_NICE
+            - NET_ADMIN
+            - NET_RAW
+        volumeMounts:
+        - name: hugepages
+          mountPath: /dev/hugepages
+        - name: dpdk-devices
+          mountPath: /dev/uio
+        - name: config
+          mountPath: /etc/ultra-cpp
+          readOnly: true
+        - name: logs
+          mountPath: /var/log/ultra-cpp
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 2
+          timeoutSeconds: 1
+          failureThreshold: 30
+      volumes:
+      - name: hugepages
+        emptyDir:
+          medium: HugePages-2Mi
+      - name: dpdk-devices
+        hostPath:
+          path: /dev/uio
+          type: Directory
+      - name: config
+        configMap:
+          name: ultra-cpp-config
+      - name: logs
+        hostPath:
+          path: /var/log/ultra-cpp
+          type: DirectoryOrCreate
+      terminationGracePeriodSeconds: 30
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1

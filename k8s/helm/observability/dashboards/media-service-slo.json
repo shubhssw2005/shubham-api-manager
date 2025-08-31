@@ -1,0 +1,143 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Media Service SLO Dashboard",
+    "tags": ["slo", "media"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Upload Success Rate SLO (99.9%)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "(\n  sum(rate(media_upload_total{status=\"success\"}[5m])) /\n  sum(rate(media_upload_total[5m]))\n) * 100",
+            "legendFormat": "Upload Success %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 99,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 99.5},
+                {"color": "green", "value": 99.9}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Processing Latency SLO (P95 < 30s)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(media_processing_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P95 Processing Time (s)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 20},
+                {"color": "red", "value": 30}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Storage Utilization",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(s3_bucket_size_bytes{bucket=~\".*media.*\"}) / (1024^3)",
+            "legendFormat": "Storage Used (GB)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "decbytes"
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "Processing Queue Depth",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(sqs_queue_messages_visible{queue_name=~\".*media.*\"})",
+            "legendFormat": "Queued Jobs"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 100},
+                {"color": "red", "value": 1000}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0}
+      },
+      {
+        "id": 5,
+        "title": "Upload Throughput by Type",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(media_upload_total[5m])) by (media_type)",
+            "legendFormat": "{{media_type}}"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Uploads/sec",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 6,
+        "title": "Processing Time by Media Type",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(media_processing_duration_seconds_bucket[5m])) by (le, media_type))",
+            "legendFormat": "P95 - {{media_type}}"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Processing Time (s)",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      }
+    ]
+  }
+}

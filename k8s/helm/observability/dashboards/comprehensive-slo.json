@@ -1,0 +1,284 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Comprehensive SLO Dashboard",
+    "tags": ["slo", "error-budget", "comprehensive"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "service",
+          "type": "query",
+          "query": "label_values(http_requests_total, service)",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        },
+        {
+          "name": "tenant",
+          "type": "query",
+          "query": "label_values(http_requests_total, tenant_id)",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "SLO Compliance Overview",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "(\n  sum(rate(http_requests_total{service=~\"$service\", code!~\"5..\"}[5m])) /\n  sum(rate(http_requests_total{service=~\"$service\"}[5m]))\n) * 100",
+            "legendFormat": "Availability %"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{service=~\"$service\"}[5m])) by (le)) * 1000",
+            "legendFormat": "P99 Latency (ms)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 99.9},
+                {"color": "green", "value": 99.99}
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Availability %"},
+              "properties": [
+                {"id": "unit", "value": "percent"},
+                {"id": "min", "value": 99},
+                {"id": "max", "value": 100}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "P99 Latency (ms)"},
+              "properties": [
+                {"id": "unit", "value": "ms"},
+                {"id": "thresholds", "value": {
+                  "steps": [
+                    {"color": "green", "value": 0},
+                    {"color": "yellow", "value": 150},
+                    {"color": "red", "value": 200}
+                  ]
+                }}
+              ]
+            }
+          ]
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Error Budget Status",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "(\n  1 - (\n    (\n      sum(increase(http_requests_total{service=~\"$service\", code=~\"5..\"}[30d])) /\n      sum(increase(http_requests_total{service=~\"$service\"}[30d]))\n    ) / 0.0001\n  )\n) * 100",
+            "legendFormat": "30-day Error Budget"
+          },
+          {
+            "expr": "(\n  1 - (\n    (\n      sum(increase(http_requests_total{service=~\"$service\", code=~\"5..\"}[7d])) /\n      sum(increase(http_requests_total{service=~\"$service\"}[7d]))\n    ) / 0.0001\n  )\n) * 100",
+            "legendFormat": "7-day Error Budget"
+          },
+          {
+            "expr": "(\n  1 - (\n    (\n      sum(increase(http_requests_total{service=~\"$service\", code=~\"5..\"}[1d])) /\n      sum(increase(http_requests_total{service=~\"$service\"}[1d]))\n    ) / 0.0001\n  )\n) * 100",
+            "legendFormat": "1-day Error Budget"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 25},
+                {"color": "green", "value": 50}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Error Budget Burn Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "(\n  sum(rate(http_requests_total{service=~\"$service\", code=~\"5..\"}[1h])) /\n  sum(rate(http_requests_total{service=~\"$service\"}[1h]))\n) / 0.0001",
+            "legendFormat": "1h Burn Rate"
+          },
+          {
+            "expr": "(\n  sum(rate(http_requests_total{service=~\"$service\", code=~\"5..\"}[6h])) /\n  sum(rate(http_requests_total{service=~\"$service\"}[6h]))\n) / 0.0001",
+            "legendFormat": "6h Burn Rate"
+          },
+          {
+            "expr": "(\n  sum(rate(http_requests_total{service=~\"$service\", code=~\"5..\"}[24h])) /\n  sum(rate(http_requests_total{service=~\"$service\"}[24h]))\n) / 0.0001",
+            "legendFormat": "24h Burn Rate"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Burn Rate Multiplier",
+            "min": 0,
+            "logBase": 2
+          }
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {"params": [14.4], "type": "gt"},
+              "operator": {"type": "and"},
+              "query": {"params": ["A", "5m", "now"]},
+              "reducer": {"params": [], "type": "last"},
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "2m",
+          "frequency": "10s",
+          "handler": 1,
+          "name": "High Error Budget Burn Rate",
+          "noDataState": "no_data",
+          "notifications": []
+        },
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Request Volume and Success Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{service=~\"$service\"}[5m]))",
+            "legendFormat": "Total Requests/sec",
+            "yAxis": 1
+          },
+          {
+            "expr": "(\n  sum(rate(http_requests_total{service=~\"$service\", code!~\"5..\"}[5m])) /\n  sum(rate(http_requests_total{service=~\"$service\"}[5m]))\n) * 100",
+            "legendFormat": "Success Rate %",
+            "yAxis": 2
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Requests/sec",
+            "min": 0
+          },
+          {
+            "label": "Success Rate %",
+            "min": 99,
+            "max": 100,
+            "opposite": true
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 5,
+        "title": "Latency Distribution",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{service=~\"$service\"}[5m])) by (le)) * 1000",
+            "legendFormat": "P50"
+          },
+          {
+            "expr": "histogram_quantile(0.90, sum(rate(http_request_duration_seconds_bucket{service=~\"$service\"}[5m])) by (le)) * 1000",
+            "legendFormat": "P90"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service=~\"$service\"}[5m])) by (le)) * 1000",
+            "legendFormat": "P95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{service=~\"$service\"}[5m])) by (le)) * 1000",
+            "legendFormat": "P99"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Response Time (ms)",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      },
+      {
+        "id": 6,
+        "title": "Error Rate by Service and Tenant",
+        "type": "heatmap",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{service=~\"$service\", tenant_id=~\"$tenant\", code=~\"5..\"}[5m])) by (service, tenant_id)",
+            "legendFormat": "{{service}} - {{tenant_id}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24}
+      },
+      {
+        "id": 7,
+        "title": "SLO Compliance Trend (7 days)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "(\n  sum(rate(http_requests_total{service=~\"$service\", code!~\"5..\"}[1h])) /\n  sum(rate(http_requests_total{service=~\"$service\"}[1h]))\n) * 100",
+            "legendFormat": "Availability SLO (99.99%)"
+          },
+          {
+            "expr": "99.99",
+            "legendFormat": "SLO Target"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Availability %",
+            "min": 99.9,
+            "max": 100
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32}
+      },
+      {
+        "id": 8,
+        "title": "Time to SLO Violation",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "(\n  (\n    1 - (\n      sum(increase(http_requests_total{service=~\"$service\", code=~\"5..\"}[30d])) /\n      sum(increase(http_requests_total{service=~\"$service\"}[30d]))\n    ) / 0.0001\n  ) * 30 * 24 * 3600\n) / (\n  sum(rate(http_requests_total{service=~\"$service\", code=~\"5..\"}[1h])) /\n  sum(rate(http_requests_total{service=~\"$service\"}[1h]))\n)",
+            "legendFormat": "Time to Violation (hours)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "h",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 24},
+                {"color": "green", "value": 168}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32}
+      }
+    ]
+  }
+}

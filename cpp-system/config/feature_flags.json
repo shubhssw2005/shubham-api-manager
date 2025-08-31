@@ -1,0 +1,69 @@
+{
+  "ultra_fast_api": {
+    "enabled": true,
+    "description": "Enable ultra-fast C++ API endpoints",
+    "rollout_percentage": 100.0,
+    "allowed_users": [],
+    "allowed_groups": ["beta_testers", "premium_users"],
+    "metadata": {
+      "owner": "performance_team",
+      "created_date": "2025-01-01"
+    }
+  },
+  "gpu_acceleration": {
+    "enabled": false,
+    "description": "Enable GPU acceleration for media processing",
+    "rollout_percentage": 5.0,
+    "allowed_users": ["admin", "test_user"],
+    "allowed_groups": ["gpu_beta"],
+    "metadata": {
+      "owner": "media_team",
+      "requires_gpu": "true"
+    }
+  },
+  "advanced_caching": {
+    "enabled": true,
+    "description": "Enable advanced lock-free caching system",
+    "rollout_percentage": 50.0,
+    "allowed_users": [],
+    "allowed_groups": [],
+    "metadata": {
+      "owner": "cache_team",
+      "performance_impact": "high"
+    }
+  },
+  "real_time_metrics": {
+    "enabled": true,
+    "description": "Enable real-time performance metrics collection",
+    "rollout_percentage": 100.0,
+    "allowed_users": [],
+    "allowed_groups": [],
+    "metadata": {
+      "owner": "monitoring_team",
+      "overhead": "minimal"
+    }
+  },
+  "ab_testing_framework": {
+    "enabled": true,
+    "description": "Enable A/B testing framework for routing",
+    "rollout_percentage": 25.0,
+    "allowed_users": [],
+    "allowed_groups": ["product_team"],
+    "metadata": {
+      "owner": "product_team",
+      "experimental": "true"
+    }
+  },
+  "dpdk_networking": {
+    "enabled": false,
+    "description": "Enable DPDK kernel bypass networking",
+    "rollout_percentage": 0.0,
+    "allowed_users": ["system_admin"],
+    "allowed_groups": ["infrastructure"],
+    "metadata": {
+      "owner": "network_team",
+      "requires_privileges": "true",
+      "hardware_dependent": "true"
+    }
+  }
+}

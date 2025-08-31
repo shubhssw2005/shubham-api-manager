@@ -1,0 +1,168 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: api-service
+  namespace: production
+spec:
+  replicas: 10
+  strategy:
+    canary:
+      # Canary deployment strategy
+      steps:
+      - setWeight: 10  # Start with 10% traffic
+      - pause:
+          duration: 2m  # Wait 2 minutes
+      - setWeight: 25  # Increase to 25%
+      - pause:
+          duration: 5m  # Wait 5 minutes
+      - setWeight: 50  # Increase to 50%
+      - pause:
+          duration: 10m # Wait 10 minutes
+      - setWeight: 75  # Increase to 75%
+      - pause:
+          duration: 5m  # Wait 5 minutes
+      # If all analysis passes, promote to 100%
+      
+      # Traffic routing via Istio
+      trafficRouting:
+        istio:
+          virtualService:
+            name: api-service-vs
+            routes:
+            - primary
+          destinationRule:
+            name: api-service-dr
+            canarySubsetName: canary
+            stableSubsetName: stable
+      
+      # Automated analysis during canary
+      analysis:
+        templates:
+        - templateName: success-rate
+        - templateName: latency-p99
+        args:
+        - name: service-name
+          value: api-service
+        - name: namespace
+          value: production
+        
+        # Start analysis after first step
+        startingStep: 1
+        
+        # Analysis interval
+        interval: 30s
+        
+        # Number of measurements
+        count: 10
+        
+        # Success conditions
+        successCondition: result[0] >= 0.99 && result[1] <= 200
+        
+        # Failure conditions (automatic rollback)
+        failureCondition: result[0] < 0.95 || result[1] > 500
+
+  selector:
+    matchLabels:
+      app: api-service
+  
+  template:
+    metadata:
+      labels:
+        app: api-service
+        version: canary
+    spec:
+      containers:
+      - name: api-service
+        image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/api-service:latest
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3000"
+        - name: MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              name: api-secrets
+              key: mongodb-uri
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: api-secrets
+              key: redis-url
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: api-secrets
+              key: jwt-secret
+        
+        # Resource limits
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        # Security context
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        
+        # Volume mounts for temp files
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /app/.cache
+      
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: cache
+        emptyDir: {}
+      
+      # Pod security
+      securityContext:
+        fsGroup: 1001
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      
+      # Node selection
+      nodeSelector:
+        workload-type: general-purpose
+      
+      # Tolerations for spot instances
+      tolerations:
+      - key: "spot-instance"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"

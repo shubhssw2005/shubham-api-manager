@@ -1,0 +1,62 @@
+replicaCount: 3
+
+image:
+  repository: 123456789012.dkr.ecr.us-east-1.amazonaws.com/media-service
+  tag: "v1.0.0"
+
+resources:
+  limits:
+    cpu: 4000m
+    memory: 8Gi
+  requests:
+    cpu: 2000m
+    memory: 4Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 50
+  targetCPUUtilizationPercentage: 60
+  targetMemoryUtilizationPercentage: 70
+
+nodeSelector:
+  workload-type: media-processing
+  instance-type: memory-optimized
+
+tolerations:
+  - key: "workload-type"
+    operator: "Equal"
+    value: "media-processing"
+    effect: "NoSchedule"
+
+env:
+  - name: GO_ENV
+    value: "production"
+  - name: LOG_LEVEL
+    value: "info"
+  - name: AWS_REGION
+    value: "us-east-1"
+  - name: S3_BUCKET
+    value: "company-media-production"
+  - name: SQS_QUEUE_URL
+    value: "https://sqs.us-east-1.amazonaws.com/123456789012/media-processing-production"
+
+istio:
+  enabled: true
+  virtualService:
+    enabled: true
+    hosts:
+      - media.company.com
+    http:
+      - match:
+        - uri:
+            prefix: /media/v1
+        route:
+        - destination:
+            host: media-service
+            port:
+              number: 80
+        timeout: 300s
+        retries:
+          attempts: 2
+          perTryTimeout: 150s

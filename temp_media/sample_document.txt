@@ -1,0 +1,18 @@
+Google Interview Experience - Technical Document
+
+This document contains detailed technical notes from the Google L5 interview process.
+
+Key Topics Covered:
+1. Data Structures and Algorithms
+2. System Design Principles
+3. Coding Best Practices
+4. Interview Preparation Strategy
+
+Technical Skills Demonstrated:
+- Tree traversal algorithms
+- Graph algorithms (BFS, DFS)
+- Dynamic programming
+- System architecture design
+- Database design patterns
+
+This document serves as a reference for future interview preparations and technical discussions.

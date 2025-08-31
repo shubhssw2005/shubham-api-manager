@@ -1,0 +1,37 @@
+{
+  "new_api_performance": {
+    "control_service": "nodejs-backend",
+    "variant_service": "ultra-cpp-api",
+    "traffic_split": 0.1,
+    "user_id_header": "X-User-ID",
+    "enabled": true,
+    "include_paths": [
+      "^/api/posts/.*",
+      "^/api/media/.*"
+    ],
+    "exclude_paths": [
+      "^/api/admin/.*"
+    ]
+  },
+  "ultra_cache_test": {
+    "control_service": "redis-cache",
+    "variant_service": "ultra-cpp-cache",
+    "traffic_split": 0.05,
+    "user_id_header": "X-User-ID",
+    "enabled": false,
+    "include_paths": [
+      "^/api/cache/.*"
+    ]
+  },
+  "gpu_acceleration_test": {
+    "control_service": "cpu-media-processor",
+    "variant_service": "gpu-media-processor",
+    "traffic_split": 0.2,
+    "user_id_header": "X-User-ID",
+    "enabled": true,
+    "include_paths": [
+      "^/api/media/process/.*",
+      "^/api/media/transcode/.*"
+    ]
+  }
+}

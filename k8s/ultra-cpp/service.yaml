@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ultra-cpp-gateway
+  namespace: ultra-cpp
+  labels:
+    app: ultra-cpp-gateway
+    component: api-gateway
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local  # Preserve source IP for DPDK
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app: ultra-cpp-gateway
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ultra-cpp-metrics
+  namespace: ultra-cpp
+  labels:
+    app: ultra-cpp-gateway
+    component: metrics
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  selector:
+    app: ultra-cpp-gateway
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ultra-cpp-health
+  namespace: ultra-cpp
+  labels:
+    app: ultra-cpp-gateway
+    component: health
+spec:
+  type: ClusterIP
+  ports:
+  - name: health
+    port: 8081
+    targetPort: 8081
+    protocol: TCP
+  selector:
+    app: ultra-cpp-gateway

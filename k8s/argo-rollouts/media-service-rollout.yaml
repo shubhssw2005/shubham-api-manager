@@ -1,0 +1,122 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: media-service
+  namespace: production
+spec:
+  replicas: 6
+  strategy:
+    canary:
+      steps:
+      - setWeight: 20  # Start with 20% traffic for media service
+      - pause:
+          duration: 3m
+      - setWeight: 50
+      - pause:
+          duration: 5m
+      - setWeight: 80
+      - pause:
+          duration: 3m
+      
+      trafficRouting:
+        istio:
+          virtualService:
+            name: media-service-vs
+            routes:
+            - primary
+          destinationRule:
+            name: media-service-dr
+            canarySubsetName: canary
+            stableSubsetName: stable
+      
+      analysis:
+        templates:
+        - templateName: comprehensive-analysis
+        args:
+        - name: service-name
+          value: media-service
+        - name: namespace
+          value: production
+        startingStep: 1
+        interval: 30s
+        count: 10
+
+  selector:
+    matchLabels:
+      app: media-service
+  
+  template:
+    metadata:
+      labels:
+        app: media-service
+        version: canary
+    spec:
+      containers:
+      - name: media-service
+        image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/media-service:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: GIN_MODE
+          value: "release"
+        - name: PORT
+          value: "8080"
+        - name: AWS_REGION
+          value: "us-east-1"
+        - name: S3_BUCKET
+          valueFrom:
+            secretKeyRef:
+              name: media-secrets
+              key: s3-bucket
+        - name: SQS_QUEUE_URL
+          valueFrom:
+            secretKeyRef:
+              name: media-secrets
+              key: sqs-queue-url
+        
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      
+      securityContext:
+        fsGroup: 1001
+        runAsNonRoot: true
+      
+      nodeSelector:
+        workload-type: memory-optimized

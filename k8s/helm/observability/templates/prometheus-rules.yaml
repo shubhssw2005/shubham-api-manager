@@ -1,0 +1,270 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: slo-alerting-rules
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: prometheus
+    release: {{ .Release.Name }}
+spec:
+  groups:
+    - name: api-service-slo
+      interval: 30s
+      rules:
+        # API Availability SLO (99.99%)
+        - alert: APIAvailabilitySLOViolation
+          expr: |
+            (
+              sum(rate(http_requests_total{job="api-service", code!~"5.."}[5m])) /
+              sum(rate(http_requests_total{job="api-service"}[5m]))
+            ) * 100 < 99.99
+          for: 2m
+          labels:
+            severity: critical
+            service: api-service
+            slo: availability
+            team: platform
+          annotations:
+            summary: "API Service availability SLO violation"
+            description: "API Service availability is {{ $value }}%, below the 99.99% SLO threshold"
+            runbook_url: "https://runbooks.company.com/api-availability"
+            dashboard_url: "https://grafana.company.com/d/api-slo/api-service-slo"
+
+        # API Latency SLO (P99 < 200ms)
+        - alert: APILatencySLOViolation
+          expr: |
+            histogram_quantile(0.99, 
+              sum(rate(http_request_duration_seconds_bucket{job="api-service"}[5m])) by (le)
+            ) * 1000 > 200
+          for: 5m
+          labels:
+            severity: warning
+            service: api-service
+            slo: latency
+            team: platform
+          annotations:
+            summary: "API Service latency SLO violation"
+            description: "API Service P99 latency is {{ $value }}ms, above the 200ms SLO threshold"
+            runbook_url: "https://runbooks.company.com/api-latency"
+            dashboard_url: "https://grafana.company.com/d/api-slo/api-service-slo"
+
+        # Multi-window, multi-burn-rate alerts for error budget
+        - alert: APIErrorBudgetBurnRateCritical
+          expr: |
+            (
+              sum(rate(http_requests_total{job="api-service", code=~"5.."}[1h])) /
+              sum(rate(http_requests_total{job="api-service"}[1h]))
+            ) > (0.0001 * 14.4)  # 14.4x burn rate (exhausts budget in 2 hours)
+            and
+            (
+              sum(rate(http_requests_total{job="api-service", code=~"5.."}[5m])) /
+              sum(rate(http_requests_total{job="api-service"}[5m]))
+            ) > (0.0001 * 14.4)
+          for: 2m
+          labels:
+            severity: critical
+            service: api-service
+            slo: error-budget
+            team: platform
+            burn_rate: critical
+          annotations:
+            summary: "API Service error budget burning critically fast"
+            description: "Error budget will be exhausted in less than 2 hours at current rate ({{ $value }}x normal)"
+            runbook_url: "https://runbooks.company.com/error-budget-critical"
+            dashboard_url: "https://grafana.company.com/d/api-slo/api-service-slo"
+
+        - alert: APIErrorBudgetBurnRateHigh
+          expr: |
+            (
+              sum(rate(http_requests_total{job="api-service", code=~"5.."}[6h])) /
+              sum(rate(http_requests_total{job="api-service"}[6h]))
+            ) > (0.0001 * 6)  # 6x burn rate (exhausts budget in 5 hours)
+            and
+            (
+              sum(rate(http_requests_total{job="api-service", code=~"5.."}[30m])) /
+              sum(rate(http_requests_total{job="api-service"}[30m]))
+            ) > (0.0001 * 6)
+          for: 15m
+          labels:
+            severity: warning
+            service: api-service
+            slo: error-budget
+            team: platform
+            burn_rate: high
+          annotations:
+            summary: "API Service error budget burning at high rate"
+            description: "Error budget will be exhausted in less than 5 hours at current rate ({{ $value }}x normal)"
+            runbook_url: "https://runbooks.company.com/error-budget-high"
+            dashboard_url: "https://grafana.company.com/d/api-slo/api-service-slo"
+
+        - alert: APIErrorBudgetBurnRateMedium
+          expr: |
+            (
+              sum(rate(http_requests_total{job="api-service", code=~"5.."}[24h])) /
+              sum(rate(http_requests_total{job="api-service"}[24h]))
+            ) > (0.0001 * 3)  # 3x burn rate (exhausts budget in 10 hours)
+            and
+            (
+              sum(rate(http_requests_total{job="api-service", code=~"5.."}[2h])) /
+              sum(rate(http_requests_total{job="api-service"}[2h]))
+            ) > (0.0001 * 3)
+          for: 1h
+          labels:
+            severity: warning
+            service: api-service
+            slo: error-budget
+            team: platform
+            burn_rate: medium
+          annotations:
+            summary: "API Service error budget burning at medium rate"
+            description: "Error budget will be exhausted in less than 10 hours at current rate ({{ $value }}x normal)"
+            runbook_url: "https://runbooks.company.com/error-budget-medium"
+            dashboard_url: "https://grafana.company.com/d/api-slo/api-service-slo"
+
+        - alert: APIErrorBudgetBurnRateLow
+          expr: |
+            (
+              sum(rate(http_requests_total{job="api-service", code=~"5.."}[72h])) /
+              sum(rate(http_requests_total{job="api-service"}[72h]))
+            ) > (0.0001 * 1)  # 1x burn rate (exhausts budget in 30 days)
+            and
+            (
+              sum(rate(http_requests_total{job="api-service", code=~"5.."}[6h])) /
+              sum(rate(http_requests_total{job="api-service"}[6h]))
+            ) > (0.0001 * 1)
+          for: 6h
+          labels:
+            severity: info
+            service: api-service
+            slo: error-budget
+            team: platform
+            burn_rate: low
+          annotations:
+            summary: "API Service error budget consumption elevated"
+            description: "Error budget consumption is elevated ({{ $value }}x normal rate)"
+            runbook_url: "https://runbooks.company.com/error-budget-low"
+            dashboard_url: "https://grafana.company.com/d/api-slo/api-service-slo"
+
+        # Error budget exhaustion warning
+        - alert: APIErrorBudgetLow
+          expr: |
+            (
+              1 - (
+                (
+                  sum(increase(http_requests_total{job="api-service", code=~"5.."}[30d])) /
+                  sum(increase(http_requests_total{job="api-service"}[30d]))
+                ) / 0.0001
+              )
+            ) < 0.1  # Less than 10% error budget remaining
+          for: 5m
+          labels:
+            severity: warning
+            service: api-service
+            slo: error-budget
+            team: platform
+          annotations:
+            summary: "API Service error budget running low"
+            description: "Only {{ $value | humanizePercentage }} of error budget remaining for this 30-day window"
+            runbook_url: "https://runbooks.company.com/error-budget-low"
+            dashboard_url: "https://grafana.company.com/d/api-slo/api-service-slo"
+
+    - name: media-service-slo
+      interval: 30s
+      rules:
+        # Media Upload Success Rate SLO
+        - alert: MediaUploadSLOViolation
+          expr: |
+            (
+              sum(rate(media_upload_total{status="success"}[5m])) /
+              sum(rate(media_upload_total[5m]))
+            ) * 100 < 99.9
+          for: 5m
+          labels:
+            severity: warning
+            service: media-service
+            slo: upload-success
+          annotations:
+            summary: "Media upload success rate SLO violation"
+            description: "Media upload success rate is {{ $value }}%, below the 99.9% SLO threshold"
+            runbook_url: "https://runbooks.company.com/media-upload"
+
+        # Media Processing Latency SLO
+        - alert: MediaProcessingLatencySLOViolation
+          expr: |
+            histogram_quantile(0.95, 
+              sum(rate(media_processing_duration_seconds_bucket[5m])) by (le)
+            ) > 30
+          for: 10m
+          labels:
+            severity: warning
+            service: media-service
+            slo: processing-latency
+          annotations:
+            summary: "Media processing latency SLO violation"
+            description: "Media processing P95 latency is {{ $value }}s, above the 30s SLO threshold"
+            runbook_url: "https://runbooks.company.com/media-processing"
+
+        # Processing Queue Depth
+        - alert: MediaProcessingQueueHigh
+          expr: |
+            sum(sqs_queue_messages_visible{queue_name=~".*media.*"}) > 1000
+          for: 5m
+          labels:
+            severity: warning
+            service: media-service
+            slo: queue-depth
+          annotations:
+            summary: "Media processing queue depth is high"
+            description: "{{ $value }} messages in processing queue, may indicate processing bottleneck"
+            runbook_url: "https://runbooks.company.com/queue-management"
+
+    - name: infrastructure-slo
+      interval: 30s
+      rules:
+        # Database Connection Pool
+        - alert: DatabaseConnectionPoolHigh
+          expr: |
+            (
+              sum(database_connections_active) /
+              sum(database_connections_max)
+            ) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+            service: database
+            slo: connection-pool
+          annotations:
+            summary: "Database connection pool utilization is high"
+            description: "Database connection pool is {{ $value }}% utilized"
+            runbook_url: "https://runbooks.company.com/database-connections"
+
+        # Redis Memory Usage
+        - alert: RedisMemoryUsageHigh
+          expr: |
+            (
+              redis_memory_used_bytes /
+              redis_memory_max_bytes
+            ) * 100 > 85
+          for: 5m
+          labels:
+            severity: warning
+            service: redis
+            slo: memory-usage
+          annotations:
+            summary: "Redis memory usage is high"
+            description: "Redis memory usage is {{ $value }}% of maximum"
+            runbook_url: "https://runbooks.company.com/redis-memory"
+
+        # Kubernetes Pod Restart Rate
+        - alert: PodRestartRateHigh
+          expr: |
+            rate(kube_pod_container_status_restarts_total[15m]) * 60 > 0.5
+          for: 5m
+          labels:
+            severity: warning
+            service: kubernetes
+            slo: pod-stability
+          annotations:
+            summary: "Pod restart rate is high"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is restarting frequently"
+            runbook_url: "https://runbooks.company.com/pod-restarts"

@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ultra-cpp-config
+  namespace: ultra-cpp
+data:
+  ultra-cpp.conf: |
+    # Ultra C++ System Configuration
+    
+    [api_gateway]
+    port = 8080
+    worker_threads = 4
+    memory_pool_size = 2147483648
+    fallback_upstream = "http://nodejs-api:3005"
+    enable_dpdk = true
+    
+    [cache]
+    capacity = 1000000
+    shard_count = 64
+    enable_rdma = false
+    backing_file = "/tmp/ultra-cache.mmap"
+    
+    [stream_processor]
+    queue_size = 1048576
+    batch_size = 1000
+    processing_threads = 2
+    
+    [gpu_compute]
+    device_id = 0
+    memory_pool_size = 536870912
+    enable_tensorrt = true
+    
+    [performance_monitor]
+    collection_interval_ms = 100
+    enable_hardware_counters = true
+    prometheus_port = 9090
+    
+    [logging]
+    level = "INFO"
+    file = "/var/log/ultra-cpp/ultra-cpp.log"
+    max_size_mb = 100
+    max_files = 10
+    
+    [security]
+    enable_jwt_validation = true
+    jwt_secret_file = "/etc/secrets/jwt-secret"
+    rate_limit_requests_per_second = 100000
+    
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s
+      evaluation_interval: 5s
+    
+    scrape_configs:
+    - job_name: 'ultra-cpp'
+      static_configs:
+      - targets: ['localhost:9090']
+      scrape_interval: 1s
+      metrics_path: /metrics
+      
+  dpdk.conf: |
+    # DPDK Configuration
+    [EAL]
+    -c 0xf
+    -n 4
+    --huge-dir /dev/hugepages
+    --file-prefix ultra-cpp
+    --proc-type primary
+    
+    [PORT0]
+    pci = 0000:00:08.0
+    
+    [PORT1]
+    pci = 0000:00:09.0

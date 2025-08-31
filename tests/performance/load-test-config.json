@@ -1,0 +1,307 @@
+{
+  "testConfiguration": {
+    "environment": {
+      "apiBaseUrl": "http://localhost:3000",
+      "metricsUrl": "http://localhost:9090",
+      "chaosApiUrl": "http://localhost:8080",
+      "tenantId": "test-tenant"
+    },
+    "sloTargets": {
+      "availability": 0.9999,
+      "p95Latency": 200,
+      "p99Latency": 500,
+      "errorRate": 0.01,
+      "throughput": 100000
+    },
+    "loadTestScenarios": {
+      "apiLoad": {
+        "baselineLoad": {
+          "vus": 50,
+          "duration": "5m",
+          "rampUp": "2m",
+          "rampDown": "2m"
+        },
+        "stressTest": {
+          "maxVus": 5000,
+          "stages": [
+            { "duration": "2m", "target": 100 },
+            { "duration": "5m", "target": 500 },
+            { "duration": "10m", "target": 1000 },
+            { "duration": "15m", "target": 2000 },
+            { "duration": "10m", "target": 5000 },
+            { "duration": "5m", "target": 0 }
+          ]
+        },
+        "spikeTest": {
+          "baseVus": 100,
+          "spikeVus": 2000,
+          "spikeDuration": "2m"
+        },
+        "soakTest": {
+          "vus": 200,
+          "duration": "1h"
+        }
+      },
+      "mediaUpload": {
+        "concurrentUploads": {
+          "vus": 50,
+          "duration": "10m"
+        },
+        "largeFileTest": {
+          "vus": 5,
+          "duration": "15m",
+          "fileSizeRange": [50000000, 200000000]
+        },
+        "uploadStress": {
+          "maxVus": 200,
+          "stages": [
+            { "duration": "1m", "target": 10 },
+            { "duration": "3m", "target": 50 },
+            { "duration": "5m", "target": 100 },
+            { "duration": "10m", "target": 200 },
+            { "duration": "2m", "target": 0 }
+          ]
+        }
+      },
+      "chaosEngineering": {
+        "databaseChaos": {
+          "duration": 120,
+          "vus": 20,
+          "failureType": "pod-failure"
+        },
+        "cacheChaos": {
+          "duration": 90,
+          "vus": 15,
+          "failureType": "network-partition"
+        },
+        "storageChaos": {
+          "duration": 180,
+          "vus": 10,
+          "failureType": "network-delay"
+        },
+        "networkChaos": {
+          "duration": 150,
+          "vus": 25,
+          "failureType": "network-partition"
+        },
+        "podChaos": {
+          "duration": 100,
+          "vus": 30,
+          "failureType": "pod-kill"
+        }
+      },
+      "performanceBenchmarks": {
+        "baseline": {
+          "vus": 50,
+          "duration": "5m",
+          "operations": ["read_heavy", "write_light", "cache_test"],
+          "weights": [0.7, 0.2, 0.1]
+        },
+        "capacityPlanning": {
+          "maxVus": 10000,
+          "stages": [
+            { "duration": "2m", "target": 100 },
+            { "duration": "2m", "target": 200 },
+            { "duration": "2m", "target": 500 },
+            { "duration": "2m", "target": 1000 },
+            { "duration": "2m", "target": 2000 },
+            { "duration": "2m", "target": 5000 },
+            { "duration": "2m", "target": 10000 },
+            { "duration": "5m", "target": 10000 },
+            { "duration": "2m", "target": 0 }
+          ]
+        },
+        "scalability": {
+          "exponentialGrowth": true,
+          "stages": [
+            { "duration": "1m", "target": 10 },
+            { "duration": "1m", "target": 100 },
+            { "duration": "1m", "target": 1000 },
+            { "duration": "1m", "target": 10000 },
+            { "duration": "2m", "target": 10000 },
+            { "duration": "1m", "target": 0 }
+          ]
+        },
+        "efficiency": {
+          "vus": 1000,
+          "duration": "10m",
+          "resourceMetrics": ["cpu", "memory", "network", "database"]
+        },
+        "endurance": {
+          "vus": 500,
+          "duration": "24h",
+          "enabled": false
+        }
+      }
+    },
+    "chaosExperiments": {
+      "database": {
+        "name": "database-failure",
+        "action": "pod-failure",
+        "selector": "app=postgres",
+        "mode": "one",
+        "duration": 120
+      },
+      "cache": {
+        "name": "redis-failure",
+        "action": "network-partition",
+        "selector": "app=redis",
+        "mode": "all",
+        "duration": 90
+      },
+      "storage": {
+        "name": "s3-latency",
+        "action": "network-delay",
+        "selector": "service=s3-proxy",
+        "delay": "2000ms",
+        "duration": 180
+      },
+      "network": {
+        "name": "network-partition",
+        "action": "network-partition",
+        "selector": "tier=api",
+        "mode": "random-one",
+        "duration": 150
+      },
+      "pod": {
+        "name": "api-pod-kill",
+        "action": "pod-kill",
+        "selector": "app=api-service",
+        "mode": "random-max-percent",
+        "value": "50",
+        "duration": 100
+      }
+    },
+    "capacityPlanning": {
+      "growthProjections": {
+        "userGrowth": 0.15,
+        "dataGrowth": 0.25,
+        "trafficGrowth": 0.20,
+        "featureComplexity": 0.05
+      },
+      "resourceLimits": {
+        "cpu": {
+          "utilizationTarget": 80,
+          "costPerVCPUHour": 0.0464,
+          "scalingFactor": 1.5
+        },
+        "memory": {
+          "utilizationTarget": 75,
+          "costPerGBHour": 0.0058,
+          "scalingFactor": 1.3
+        },
+        "storage": {
+          "iopsLimit": 3000,
+          "costPerGBMonth": 0.125,
+          "scalingFactor": 2.0
+        },
+        "network": {
+          "bandwidthLimit": 10000,
+          "costPerGBTransfer": 0.09,
+          "scalingFactor": 1.8
+        }
+      },
+      "projectionPeriods": [1, 3, 6, 12]
+    },
+    "thresholds": {
+      "performance": {
+        "httpReqDuration": ["p(95)<200", "p(99)<500"],
+        "httpReqFailed": ["rate<0.01"],
+        "checksRate": ["rate>0.99"]
+      },
+      "chaos": {
+        "httpReqDuration": ["p(95)<1000", "p(99)<2000"],
+        "chaosErrors": ["rate<0.1"],
+        "resilienceScore": ["rate>0.8"],
+        "recoveryTime": ["p(95)<30000"]
+      },
+      "benchmark": {
+        "performanceScore": ["value>0.8"],
+        "capacityUtilization": ["value<0.8"],
+        "resourceEfficiency": ["value>0.7"],
+        "scalabilityIndex": ["value>0.8"]
+      }
+    },
+    "reporting": {
+      "outputFormats": ["json", "html", "markdown"],
+      "metricsRetention": "30d",
+      "alerting": {
+        "enabled": true,
+        "channels": ["slack", "email"],
+        "thresholds": {
+          "criticalLatency": 1000,
+          "criticalErrorRate": 0.05,
+          "criticalAvailability": 0.99
+        }
+      }
+    }
+  },
+  "testData": {
+    "fileTypes": {
+      "image": {
+        "mimeTypes": ["image/jpeg", "image/png", "image/gif"],
+        "sizes": [50000, 100000, 500000, 1000000],
+        "extensions": ["jpg", "png", "gif"]
+      },
+      "video": {
+        "mimeTypes": ["video/mp4", "video/avi", "video/mov"],
+        "sizes": [5000000, 10000000, 50000000, 100000000],
+        "extensions": ["mp4", "avi", "mov"]
+      },
+      "document": {
+        "mimeTypes": ["application/pdf", "application/msword", "text/plain"],
+        "sizes": [100000, 500000, 2000000, 5000000],
+        "extensions": ["pdf", "doc", "txt"]
+      }
+    },
+    "sampleData": {
+      "posts": {
+        "titleLength": [10, 100],
+        "contentLength": [100, 5000],
+        "tags": ["performance", "load-test", "benchmark", "chaos", "api"]
+      },
+      "users": {
+        "emailDomains": ["example.com", "test.com", "loadtest.com"],
+        "roles": ["user", "admin", "moderator"],
+        "nameLength": [5, 25]
+      }
+    }
+  },
+  "infrastructure": {
+    "monitoring": {
+      "prometheus": {
+        "url": "http://localhost:9090",
+        "queries": {
+          "requestRate": "rate(http_requests_total[5m])",
+          "p95Latency": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+          "p99Latency": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))",
+          "errorRate": "rate(http_requests_total{status=~\"5..\"}[5m])",
+          "cpuUsage": "node_cpu_seconds_total",
+          "memoryUsage": "node_memory_MemAvailable_bytes",
+          "diskUsage": "node_filesystem_avail_bytes",
+          "networkUsage": "node_network_receive_bytes_total"
+        }
+      },
+      "grafana": {
+        "url": "http://localhost:3001",
+        "dashboards": {
+          "performance": "performance-dashboard",
+          "chaos": "chaos-engineering-dashboard",
+          "capacity": "capacity-planning-dashboard"
+        }
+      }
+    },
+    "chaosEngineering": {
+      "tools": {
+        "chaosMesh": {
+          "enabled": true,
+          "namespace": "chaos-mesh"
+        },
+        "litmus": {
+          "enabled": false,
+          "namespace": "litmus"
+        }
+      }
+    }
+  }
+}

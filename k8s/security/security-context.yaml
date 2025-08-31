@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: SecurityContext
+metadata:
+  name: secure-context
+spec:
+  # Run as non-root user
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  
+  # Read-only root filesystem
+  readOnlyRootFilesystem: true
+  
+  # Drop all capabilities
+  capabilities:
+    drop:
+      - ALL
+  
+  # Prevent privilege escalation
+  allowPrivilegeEscalation: false
+  
+  # SELinux options
+  seLinuxOptions:
+    level: "s0:c123,c456"
+  
+  # Seccomp profile
+  seccompProfile:
+    type: RuntimeDefault
+  
+  # AppArmor profile (annotation)
+  # container.apparmor.security.beta.kubernetes.io/app: runtime/default

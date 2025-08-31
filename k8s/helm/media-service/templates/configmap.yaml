@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "media-service.fullname" . }}-config
+  labels:
+    {{- include "media-service.labels" . | nindent 4 }}
+data:
+  s3-bucket: "company-media-{{ .Values.global.environment | default "production" }}"
+  sqs-queue-url: "https://sqs.{{ .Values.global.awsRegion | default "us-east-1" }}.amazonaws.com/{{ .Values.global.awsAccountId }}/media-processing-{{ .Values.global.environment | default "production" }}"
+  processing-timeout: "300"
+  max-file-size: "1073741824"  # 1GB

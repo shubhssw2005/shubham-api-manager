@@ -1,0 +1,23 @@
+apiVersion: v2
+name: worker-service
+description: A Helm chart for background worker processes
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+dependencies:
+  - name: common
+    version: "0.1.0"
+    repository: "file://../common"
+
+keywords:
+  - worker
+  - background
+  - processing
+
+maintainers:
+  - name: Platform Team
+    email: platform@company.com
+
+annotations:
+  category: Application

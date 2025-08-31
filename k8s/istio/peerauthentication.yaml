@@ -1,0 +1,32 @@
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: production
+spec:
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: api-service-mtls
+  namespace: production
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api-service
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: media-service-mtls
+  namespace: production
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: media-service
+  mtls:
+    mode: STRICT

@@ -1,0 +1,14 @@
+apiVersion: v2
+name: common
+description: Common Helm templates and utilities
+type: library
+version: 0.1.0
+
+keywords:
+  - common
+  - library
+  - templates
+
+maintainers:
+  - name: Platform Team
+    email: platform@company.com

@@ -1,0 +1,26 @@
+{{- if .Values.autoscaling.verticalPodAutoscaler.enabled }}
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ include "media-service.fullname" . }}-vpa
+  labels:
+    {{- include "media-service.labels" . | nindent 4 }}
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "media-service.fullname" . }}
+  updatePolicy:
+    updateMode: {{ .Values.autoscaling.verticalPodAutoscaler.updateMode | default "Auto" }}
+  resourcePolicy:
+    containerPolicies:
+    - containerName: {{ .Chart.Name }}
+      minAllowed:
+        cpu: {{ .Values.autoscaling.verticalPodAutoscaler.minAllowed.cpu | default "200m" }}
+        memory: {{ .Values.autoscaling.verticalPodAutoscaler.minAllowed.memory | default "256Mi" }}
+      maxAllowed:
+        cpu: {{ .Values.autoscaling.verticalPodAutoscaler.maxAllowed.cpu | default "4000m" }}
+        memory: {{ .Values.autoscaling.verticalPodAutoscaler.maxAllowed.memory | default "8Gi" }}
+      controlledResources: ["cpu", "memory"]
+      controlledValues: RequestsAndLimits
+{{- end }}

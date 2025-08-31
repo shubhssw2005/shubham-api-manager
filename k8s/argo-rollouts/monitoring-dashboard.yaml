@@ -1,0 +1,298 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argo-rollouts-dashboard
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+data:
+  argo-rollouts-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Argo Rollouts - Canary Deployments",
+        "tags": ["argo-rollouts", "canary", "deployment"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Rollout Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "argo_rollout_info",
+                "legendFormat": "{{name}} - {{phase}}"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 1},
+                    {"color": "green", "value": 2}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Canary Success Rate",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{job=\"api-service\", code!~\"5..\"}[2m])) / sum(rate(http_requests_total{job=\"api-service\"}[2m]))",
+                "legendFormat": "API Service Success Rate"
+              },
+              {
+                "expr": "sum(rate(http_requests_total{job=\"media-service\", code!~\"5..\"}[2m])) / sum(rate(http_requests_total{job=\"media-service\"}[2m]))",
+                "legendFormat": "Media Service Success Rate"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "min": 0,
+                "max": 1,
+                "unit": "percentunit"
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Canary vs Stable Traffic Split",
+            "type": "piechart",
+            "targets": [
+              {
+                "expr": "sum(rate(istio_requests_total{destination_service_name=\"api-service\", destination_version=\"stable\"}[5m]))",
+                "legendFormat": "Stable"
+              },
+              {
+                "expr": "sum(rate(istio_requests_total{destination_service_name=\"api-service\", destination_version=\"canary\"}[5m]))",
+                "legendFormat": "Canary"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 8, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "Deployment Frequency",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "increase(argo_rollout_events_total[1h])",
+                "legendFormat": "Deployments per hour"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 8, "x": 8, "y": 8}
+          },
+          {
+            "id": 5,
+            "title": "Rollback Events",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "increase(argo_rollout_events_total{reason=\"RollbackCompleted\"}[1h])",
+                "legendFormat": "Rollbacks per hour"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 8, "x": 16, "y": 8}
+          },
+          {
+            "id": 6,
+            "title": "Analysis Run Results",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "argo_rollout_analysis_run_info",
+                "format": "table",
+                "instant": true
+              }
+            ],
+            "transformations": [
+              {
+                "id": "organize",
+                "options": {
+                  "excludeByName": {
+                    "Time": true,
+                    "__name__": true
+                  },
+                  "renameByName": {
+                    "name": "Analysis Run",
+                    "phase": "Status",
+                    "rollout": "Rollout"
+                  }
+                }
+              }
+            ],
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}
+          },
+          {
+            "id": 7,
+            "title": "P99 Latency - Canary vs Stable",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"api-service\", version=\"stable\"}[2m])) by (le)) * 1000",
+                "legendFormat": "Stable P99"
+              },
+              {
+                "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"api-service\", version=\"canary\"}[2m])) by (le)) * 1000",
+                "legendFormat": "Canary P99"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "ms"
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+          },
+          {
+            "id": 8,
+            "title": "Error Rate - Canary vs Stable",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{job=\"api-service\", version=\"stable\", code=~\"5..\"}[2m])) / sum(rate(http_requests_total{job=\"api-service\", version=\"stable\"}[2m]))",
+                "legendFormat": "Stable Error Rate"
+              },
+              {
+                "expr": "sum(rate(http_requests_total{job=\"api-service\", version=\"canary\", code=~\"5..\"}[2m])) / sum(rate(http_requests_total{job=\"api-service\", version=\"canary\"}[2m]))",
+                "legendFormat": "Canary Error Rate"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percentunit",
+                "max": 0.1
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ci-cd-metrics-dashboard
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+data:
+  ci-cd-metrics-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "CI/CD Pipeline Metrics",
+        "tags": ["ci-cd", "github-actions", "deployment"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Build Success Rate",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(github_actions_workflow_runs_total{status=\"success\"}) / sum(github_actions_workflow_runs_total)",
+                "legendFormat": "Success Rate"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percentunit",
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 0.8},
+                    {"color": "green", "value": 0.95}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Build Duration",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "github_actions_workflow_run_duration_seconds",
+                "legendFormat": "{{workflow_name}}"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "s"
+              }
+            },
+            "gridPos": {"h": 8, "w": 9, "x": 6, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Deployment Frequency",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(increase(github_actions_workflow_runs_total{workflow_name=\"CI/CD Pipeline\", status=\"success\"}[24h]))",
+                "legendFormat": "Deployments/Day"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 6, "x": 15, "y": 0}
+          },
+          {
+            "id": 4,
+            "title": "Test Results",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "github_actions_test_results_total{status=\"passed\"}",
+                "legendFormat": "Passed"
+              },
+              {
+                "expr": "github_actions_test_results_total{status=\"failed\"}",
+                "legendFormat": "Failed"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 5,
+            "title": "Security Scan Results",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "trivy_vulnerabilities_total",
+                "format": "table",
+                "instant": true
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          }
+        ],
+        "time": {
+          "from": "now-24h",
+          "to": "now"
+        },
+        "refresh": "5m"
+      }
+    }

@@ -1,0 +1,87 @@
+{
+  "dataset_info": {
+    "name": "Performance Test Dataset",
+    "description": "Large dataset for testing system scalability and performance",
+    "record_count": 100000,
+    "size_mb": 50.5,
+    "created_at": "2025-01-27T10:30:00Z"
+  },
+  "sample_records": [
+    {
+      "id": 1,
+      "user_id": "user_001",
+      "event_type": "page_view",
+      "timestamp": "2025-01-27T10:30:01.123Z",
+      "data": {
+        "page": "/api/posts",
+        "duration_ms": 1250,
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "ip_address": "192.168.1.100",
+        "session_id": "sess_abc123",
+        "referrer": "https://google.com"
+      }
+    },
+    {
+      "id": 2,
+      "user_id": "user_002",
+      "event_type": "api_call",
+      "timestamp": "2025-01-27T10:30:01.456Z",
+      "data": {
+        "endpoint": "/api/media/upload",
+        "method": "POST",
+        "response_time_ms": 0.8,
+        "status_code": 200,
+        "file_size_bytes": 2048576,
+        "processing_time_ms": 15.2
+      }
+    },
+    {
+      "id": 3,
+      "user_id": "user_003",
+      "event_type": "cache_operation",
+      "timestamp": "2025-01-27T10:30:01.789Z",
+      "data": {
+        "operation": "get",
+        "key": "post:12345",
+        "hit": true,
+        "latency_ns": 50000,
+        "cache_level": "L1"
+      }
+    },
+    {
+      "id": 4,
+      "user_id": "user_004",
+      "event_type": "database_query",
+      "timestamp": "2025-01-27T10:30:02.012Z",
+      "data": {
+        "query_type": "SELECT",
+        "collection": "posts",
+        "execution_time_ms": 2.1,
+        "rows_returned": 25,
+        "index_used": true,
+        "shard": "shard_001"
+      }
+    },
+    {
+      "id": 5,
+      "user_id": "user_005",
+      "event_type": "stream_processing",
+      "timestamp": "2025-01-27T10:30:02.345Z",
+      "data": {
+        "processor": "cpp_stream_processor",
+        "events_processed": 1000,
+        "batch_size": 100,
+        "processing_latency_us": 250,
+        "throughput_eps": 4000
+      }
+    }
+  ],
+  "performance_metrics": {
+    "avg_processing_time_ms": 0.95,
+    "p95_latency_ms": 2.1,
+    "p99_latency_ms": 4.8,
+    "throughput_rps": 50000,
+    "error_rate_percent": 0.01,
+    "cache_hit_ratio": 0.94
+  }
+}

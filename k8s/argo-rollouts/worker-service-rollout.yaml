@@ -1,0 +1,170 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: worker-service
+  namespace: production
+spec:
+  replicas: 8
+  strategy:
+    canary:
+      steps:
+      - setWeight: 25  # Start with 25% of workers
+      - pause:
+          duration: 5m  # Longer pause for workers to process queued jobs
+      - setWeight: 50
+      - pause:
+          duration: 10m
+      - setWeight: 75
+      - pause:
+          duration: 5m
+      
+      # Workers don't need traffic routing, but we still want analysis
+      analysis:
+        templates:
+        - templateName: worker-analysis
+        args:
+        - name: service-name
+          value: worker-service
+        - name: namespace
+          value: production
+        startingStep: 1
+        interval: 60s  # Longer interval for worker analysis
+        count: 5
+
+  selector:
+    matchLabels:
+      app: worker-service
+  
+  template:
+    metadata:
+      labels:
+        app: worker-service
+        version: canary
+    spec:
+      containers:
+      - name: worker-service
+        image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/worker-service:latest
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: AWS_REGION
+          value: "us-east-1"
+        - name: SQS_QUEUE_URL
+          valueFrom:
+            secretKeyRef:
+              name: worker-secrets
+              key: sqs-queue-url
+        - name: S3_BUCKET
+          valueFrom:
+            secretKeyRef:
+              name: worker-secrets
+              key: s3-bucket
+        - name: MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              name: worker-secrets
+              key: mongodb-uri
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: worker-secrets
+              key: redis-url
+        
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1500m"
+        
+        livenessProbe:
+          exec:
+            command:
+            - node
+            - -e
+            - "process.exit(0)"
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /app/.cache
+      
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: cache
+        emptyDir: {}
+      
+      securityContext:
+        fsGroup: 1001
+        runAsNonRoot: true
+      
+      nodeSelector:
+        workload-type: memory-optimized
+      
+      tolerations:
+      - key: "workload-type"
+        operator: "Equal"
+        value: "memory-intensive"
+        effect: "NoSchedule"
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: worker-analysis
+  namespace: production
+spec:
+  args:
+  - name: service-name
+  - name: namespace
+  
+  metrics:
+  - name: queue-processing-rate
+    interval: 60s
+    count: 5
+    successCondition: result[0] >= 0.8  # At least 80% of messages processed successfully
+    failureCondition: result[0] < 0.5   # Less than 50% success rate triggers rollback
+    provider:
+      prometheus:
+        address: http://prometheus.observability.svc.cluster.local:9090
+        query: |
+          sum(rate(sqs_messages_processed_total{job="{{args.service-name}}", namespace="{{args.namespace}}", status="success"}[5m])) /
+          sum(rate(sqs_messages_processed_total{job="{{args.service-name}}", namespace="{{args.namespace}}"}[5m]))
+  
+  - name: worker-memory-usage
+    interval: 60s
+    count: 5
+    successCondition: result[0] <= 0.8
+    failureCondition: result[0] > 0.95
+    provider:
+      prometheus:
+        address: http://prometheus.observability.svc.cluster.local:9090
+        query: |
+          avg(container_memory_working_set_bytes{pod=~"{{args.service-name}}-.*", namespace="{{args.namespace}}"}) /
+          avg(container_spec_memory_limit_bytes{pod=~"{{args.service-name}}-.*", namespace="{{args.namespace}}"})
+  
+  - name: processing-errors
+    interval: 60s
+    count: 5
+    successCondition: result[0] <= 0.05  # Less than 5% error rate
+    failureCondition: result[0] > 0.2    # More than 20% error rate
+    provider:
+      prometheus:
+        address: http://prometheus.observability.svc.cluster.local:9090
+        query: |
+          sum(rate(media_processing_errors_total{job="{{args.service-name}}", namespace="{{args.namespace}}"}[5m])) /
+          sum(rate(media_processing_total{job="{{args.service-name}}", namespace="{{args.namespace}}"}[5m]))

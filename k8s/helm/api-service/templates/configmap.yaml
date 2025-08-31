@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "api-service.fullname" . }}-config
+  labels:
+    {{- include "api-service.labels" . | nindent 4 }}
+data:
+  NODE_ENV: {{ .Values.env | default "production" | quote }}
+  LOG_LEVEL: "info"
+  METRICS_PORT: "3000"
+  HEALTH_CHECK_PATH: "/health"

@@ -1,0 +1,20 @@
+apiVersion: v2
+name: observability
+description: Comprehensive observability stack with Prometheus, Grafana, and Jaeger
+type: application
+version: 0.1.0
+appVersion: "1.0"
+
+dependencies:
+  - name: prometheus
+    version: "25.8.0"
+    repository: "https://prometheus-community.github.io/helm-charts"
+  - name: grafana
+    version: "7.0.19"
+    repository: "https://grafana.github.io/helm-charts"
+  - name: jaeger
+    version: "0.71.14"
+    repository: "https://jaegertracing.github.io/helm-charts"
+  - name: prometheus-operator-crds
+    version: "8.0.1"
+    repository: "https://prometheus-community.github.io/helm-charts"

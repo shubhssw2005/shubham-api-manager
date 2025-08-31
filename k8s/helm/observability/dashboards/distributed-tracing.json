@@ -1,0 +1,223 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Distributed Tracing Overview",
+    "tags": ["tracing", "jaeger", "performance"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "service",
+          "type": "query",
+          "query": "label_values(jaeger_traces_total, service_name)",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        },
+        {
+          "name": "operation",
+          "type": "query",
+          "query": "label_values(jaeger_traces_total{service_name=~\"$service\"}, operation_name)",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Trace Volume",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(jaeger_traces_total{service_name=~\"$service\"}[5m]))",
+            "legendFormat": "Traces/sec"
+          },
+          {
+            "expr": "sum(jaeger_spans_total{service_name=~\"$service\"})",
+            "legendFormat": "Total Spans"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Traces/sec"},
+              "properties": [
+                {"id": "unit", "value": "reqps"}
+              ]
+            }
+          ]
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Trace Latency Distribution",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(jaeger_trace_duration_seconds_bucket{service_name=~\"$service\"}[5m])) by (le)) * 1000",
+            "legendFormat": "P50 (ms)"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(jaeger_trace_duration_seconds_bucket{service_name=~\"$service\"}[5m])) by (le)) * 1000",
+            "legendFormat": "P95 (ms)"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(jaeger_trace_duration_seconds_bucket{service_name=~\"$service\"}[5m])) by (le)) * 1000",
+            "legendFormat": "P99 (ms)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 100},
+                {"color": "red", "value": 500}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Error Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "(\n  sum(rate(jaeger_spans_total{service_name=~\"$service\", status=\"error\"}[5m])) /\n  sum(rate(jaeger_spans_total{service_name=~\"$service\"}[5m]))\n) * 100",
+            "legendFormat": "Error Rate %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "Service Dependency Map",
+        "type": "nodeGraph",
+        "targets": [
+          {
+            "expr": "sum(rate(jaeger_spans_total[5m])) by (service_name, parent_service_name)",
+            "legendFormat": "{{service_name}} <- {{parent_service_name}}"
+          }
+        ],
+        "gridPos": {"h": 12, "w": 24, "x": 0, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Trace Duration by Service",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(jaeger_trace_duration_seconds_bucket{service_name=~\"$service\"}[5m])) by (le, service_name)) * 1000",
+            "legendFormat": "P50 - {{service_name}}"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(jaeger_trace_duration_seconds_bucket{service_name=~\"$service\"}[5m])) by (le, service_name)) * 1000",
+            "legendFormat": "P95 - {{service_name}}"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(jaeger_trace_duration_seconds_bucket{service_name=~\"$service\"}[5m])) by (le, service_name)) * 1000",
+            "legendFormat": "P99 - {{service_name}}"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Duration (ms)",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20}
+      },
+      {
+        "id": 6,
+        "title": "Operation Performance",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(jaeger_spans_total{service_name=~\"$service\", operation_name=~\"$operation\"}[5m])) by (operation_name)",
+            "legendFormat": "{{operation_name}} - Rate"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Operations/sec",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20}
+      },
+      {
+        "id": 7,
+        "title": "Span Duration Heatmap",
+        "type": "heatmap",
+        "targets": [
+          {
+            "expr": "sum(rate(jaeger_span_duration_seconds_bucket{service_name=~\"$service\"}[5m])) by (le)",
+            "legendFormat": "{{le}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 28}
+      },
+      {
+        "id": 8,
+        "title": "Top Slowest Operations",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "topk(10, avg(jaeger_span_duration_seconds{service_name=~\"$service\"}) by (operation_name, service_name)) * 1000",
+            "legendFormat": "{{service_name}} - {{operation_name}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 36}
+      },
+      {
+        "id": 9,
+        "title": "Error Traces by Service",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "sum(rate(jaeger_spans_total{service_name=~\"$service\", status=\"error\"}[5m])) by (service_name, operation_name)",
+            "legendFormat": "{{service_name}} - {{operation_name}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 36}
+      }
+    ]
+  }
+}

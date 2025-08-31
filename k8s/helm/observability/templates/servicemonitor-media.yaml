@@ -1,0 +1,38 @@
+{{- if .Values.serviceMonitors.media-service.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: media-service-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: media-service
+    release: {{ .Release.Name }}
+spec:
+  selector:
+    matchLabels:
+      {{- toYaml .Values.serviceMonitors.media-service.selector.matchLabels | nindent 6 }}
+  endpoints:
+    {{- range .Values.serviceMonitors.media-service.endpoints }}
+    - port: {{ .port }}
+      interval: {{ .interval }}
+      path: {{ .path }}
+      scheme: http
+      honorLabels: true
+      metricRelabelings:
+        # Add cluster label
+        - sourceLabels: []
+          targetLabel: cluster
+          replacement: {{ $.Values.global.environment }}
+        # Add service label
+        - sourceLabels: []
+          targetLabel: service
+          replacement: media-service
+        # Relabel tenant_id to tenant for consistency
+        - sourceLabels: [tenant_id]
+          targetLabel: tenant
+          replacement: ${1}
+    {{- end }}
+  namespaceSelector:
+    matchNames:
+      - default
+{{- end }}

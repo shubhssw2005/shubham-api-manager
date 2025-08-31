@@ -1,0 +1,59 @@
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: api-service-authz
+  namespace: production
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api-service
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"]
+  - from:
+    - source:
+        namespaces: ["production"]
+    to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+        paths: ["/api/*", "/health", "/metrics"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: media-service-authz
+  namespace: production
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: media-service
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"]
+  - from:
+    - source:
+        namespaces: ["production"]
+    to:
+    - operation:
+        methods: ["GET", "POST"]
+        paths: ["/media/*", "/health", "/metrics"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: worker-service-authz
+  namespace: production
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: worker-service
+  rules:
+  - from:
+    - source:
+        namespaces: ["production"]
+    to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/health", "/metrics"]

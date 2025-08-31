@@ -1,0 +1,227 @@
+# Observability Stack Configuration
+global:
+  environment: development
+  domain: "observability.local"
+  storageClass: "gp3"
+
+# Prometheus Configuration
+prometheus:
+  enabled: true
+  prometheusSpec:
+    retention: 30d
+    retentionSize: "50GB"
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 100Gi
+    
+    resources:
+      requests:
+        memory: "2Gi"
+        cpu: "1000m"
+      limits:
+        memory: "4Gi"
+        cpu: "2000m"
+    
+    # Service Monitor selectors
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector: {}
+    podMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelector: {}
+    
+    # Scrape configs for custom metrics
+    additionalScrapeConfigs:
+      - job_name: 'api-service'
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+                - default
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: api-service
+          - source_labels: [__meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: metrics
+      
+      - job_name: 'media-service'
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+                - default
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: media-service
+          - source_labels: [__meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: metrics
+
+  # Alertmanager configuration
+  alertmanager:
+    enabled: true
+    alertmanagerSpec:
+      storage:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: gp3
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 10Gi
+      
+      resources:
+        requests:
+          memory: "256Mi"
+          cpu: "100m"
+        limits:
+          memory: "512Mi"
+          cpu: "200m"
+
+# Grafana Configuration
+grafana:
+  enabled: true
+  
+  # Admin credentials
+  adminPassword: "admin123"
+  
+  # Persistence
+  persistence:
+    enabled: true
+    storageClassName: gp3
+    size: 10Gi
+  
+  # Resources
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "200m"
+  
+  # Data sources
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          url: http://prometheus-server:80
+          access: proxy
+          isDefault: true
+        - name: Jaeger
+          type: jaeger
+          url: http://jaeger-query:16686
+          access: proxy
+  
+  # Dashboard providers
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+        - name: 'slo'
+          orgId: 1
+          folder: 'SLO Monitoring'
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/slo
+  
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 80
+
+# Jaeger Configuration
+jaeger:
+  enabled: true
+  
+  # Use all-in-one deployment for development
+  allInOne:
+    enabled: true
+    image: jaegertracing/all-in-one:1.51
+    
+    # Resources
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "200m"
+    
+    # Storage configuration
+    storage:
+      type: memory
+      # For production, use Elasticsearch or Cassandra
+      # elasticsearch:
+      #   host: elasticsearch
+      #   port: 9200
+  
+  # Collector configuration
+  collector:
+    enabled: false  # Using all-in-one for simplicity
+  
+  # Query service
+  query:
+    enabled: false  # Using all-in-one for simplicity
+
+# Service Monitors for application metrics
+serviceMonitors:
+  api-service:
+    enabled: true
+    selector:
+      matchLabels:
+        app: api-service
+    endpoints:
+      - port: metrics
+        interval: 30s
+        path: /metrics
+  
+  media-service:
+    enabled: true
+    selector:
+      matchLabels:
+        app: media-service
+    endpoints:
+      - port: metrics
+        interval: 30s
+        path: /metrics
+
+# Alertmanager configuration
+alertmanager:
+  slack:
+    apiUrl: ""  # Set this to your Slack webhook URL
+  pagerduty:
+    routingKey: ""  # Set this to your PagerDuty routing key
+  
+# Additional monitoring components
+nodeExporter:
+  enabled: true
+  
+kubeStateMetrics:
+  enabled: true
+
+# CloudWatch integration (for AWS metrics)
+cloudwatchExporter:
+  enabled: false
+  aws:
+    region: us-east-1
+    accessKey: ""
+    secretKey: ""

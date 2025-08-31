@@ -1,0 +1,185 @@
+{{- if .Values.grafana.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: grafana
+    release: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.grafana.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: grafana
+      securityContext:
+        runAsUser: 472
+        runAsGroup: 472
+        fsGroup: 472
+      containers:
+      - name: grafana
+        image: grafana/grafana:10.1.0
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          {{- if .Values.grafana.admin.existingSecret }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.grafana.admin.existingSecret }}
+              key: {{ .Values.grafana.admin.passwordKey }}
+          {{- else }}
+          value: {{ .Values.grafana.adminPassword | quote }}
+          {{- end }}
+        - name: GF_USERS_ALLOW_SIGN_UP
+          value: "false"
+        - name: GF_USERS_AUTO_ASSIGN_ORG_ROLE
+          value: "Viewer"
+        - name: GF_AUTH_ANONYMOUS_ENABLED
+          value: "false"
+        - name: GF_SECURITY_ALLOW_EMBEDDING
+          value: "true"
+        - name: GF_INSTALL_PLUGINS
+          value: "grafana-piechart-panel,grafana-worldmap-panel,grafana-clock-panel"
+        {{- if .Values.grafana.database }}
+        - name: GF_DATABASE_TYPE
+          value: {{ .Values.grafana.database.type }}
+        - name: GF_DATABASE_HOST
+          value: {{ .Values.grafana.database.host }}
+        - name: GF_DATABASE_NAME
+          value: {{ .Values.grafana.database.name }}
+        - name: GF_DATABASE_USER
+          value: {{ .Values.grafana.database.user }}
+        - name: GF_DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.grafana.database.passwordSecret }}
+              key: {{ .Values.grafana.database.passwordKey }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.grafana.resources | nindent 10 }}
+        volumeMounts:
+        - name: grafana-storage
+          mountPath: /var/lib/grafana
+        - name: grafana-datasources
+          mountPath: /etc/grafana/provisioning/datasources
+        - name: grafana-dashboards-config
+          mountPath: /etc/grafana/provisioning/dashboards
+        - name: grafana-dashboards-default
+          mountPath: /var/lib/grafana/dashboards/default
+        - name: grafana-dashboards-slo
+          mountPath: /var/lib/grafana/dashboards/slo
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 60
+          timeoutSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 10
+          timeoutSeconds: 10
+      volumes:
+      - name: grafana-storage
+        {{- if .Values.grafana.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: grafana-storage
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+      - name: grafana-datasources
+        configMap:
+          name: grafana-datasources
+      - name: grafana-dashboards-config
+        configMap:
+          name: grafana-dashboards-config
+      - name: grafana-dashboards-default
+        configMap:
+          name: grafana-dashboards-default
+      - name: grafana-dashboards-slo
+        configMap:
+          name: grafana-dashboards-slo
+---
+{{- if .Values.grafana.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-storage
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: {{ .Values.grafana.persistence.storageClassName }}
+  resources:
+    requests:
+      storage: {{ .Values.grafana.persistence.size }}
+{{- end }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grafana
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: grafana
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "3000"
+    prometheus.io/path: "/metrics"
+spec:
+  type: {{ .Values.grafana.service.type }}
+  ports:
+  - port: {{ .Values.grafana.service.port }}
+    targetPort: 3000
+    name: http
+  selector:
+    app: grafana
+{{- if .Values.grafana.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    {{- toYaml .Values.grafana.ingress.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.grafana.ingress.ingressClassName }}
+  {{- if .Values.grafana.ingress.tls }}
+  tls:
+    {{- toYaml .Values.grafana.ingress.tls | nindent 4 }}
+  {{- end }}
+  rules:
+  {{- range .Values.grafana.ingress.hosts }}
+  - host: {{ . }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: {{ $.Values.grafana.service.port }}
+  {{- end }}
+{{- end }}
+{{- end }}

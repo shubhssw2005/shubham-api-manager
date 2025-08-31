@@ -1,0 +1,5 @@
+id,title,author,status,views,likes,tags,created_at
+"1","Getting Started with Ultra-Low Latency Systems","Tech Team","published",1250,45,"performance;cpp;optimization","2025-08-29T10:00:00Z"
+"2","FoundationDB Integration Patterns","Database Team","published",890,32,"database;foundationdb;scaling","2025-08-28T15:30:00Z"
+"3","Memory Management in C++ Systems","Performance Team","published",2100,78,"cpp;memory;performance","2025-08-27T09:15:00Z"
+"4","Kubernetes Deployment Strategies","DevOps Team","draft",0,0,"kubernetes;deployment;devops","2025-08-26T14:20:00Z"

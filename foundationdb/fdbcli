@@ -1,0 +1,97 @@
+#!/bin/bash
+echo "FoundationDB CLI (Mock Version for Testing)"
+
+# Create data storage directory
+DATA_STORE="./foundationdb/data/keyvalue_store"
+mkdir -p "$DATA_STORE"
+
+case "$1" in
+    --exec)
+        case "$2" in
+            "status")
+                echo "Using cluster file \`./foundationdb/fdb.cluster'."
+                echo ""
+                echo "Configuration:"
+                echo "  Redundancy mode        - single"
+                echo "  Storage engine         - memory"
+                echo "  Coordinators           - 1"
+                echo ""
+                echo "Cluster:"
+                echo "  FoundationDB processes - 1"
+                echo "  Zones                  - 1"
+                echo "  Machines               - 1"
+                echo "  Memory availability    - 4.1 GB per process"
+                echo "  Fault Tolerance        - 0 machines"
+                echo "  Server time            - $(date)"
+                echo ""
+                # Show stored keys count
+                KEY_COUNT=$(find "$DATA_STORE" -name "*.key" 2>/dev/null | wc -l | tr -d ' ')
+                echo "  Stored keys            - $KEY_COUNT"
+                ;;
+            "configure new single memory")
+                echo "Database created"
+                ;;
+            "writemode on")
+                echo "Write mode enabled"
+                ;;
+            set\ *)
+                # Parse set command: set key value
+                KEY=$(echo "$2" | cut -d' ' -f2)
+                VALUE=$(echo "$2" | cut -d' ' -f3-)
+                if [[ -n "$KEY" && -n "$VALUE" ]]; then
+                    echo "$VALUE" > "$DATA_STORE/${KEY}.key"
+                    echo "Committed ($(date +%s))"
+                else
+                    echo "Usage: set <key> <value>"
+                fi
+                ;;
+            get\ *)
+                # Parse get command: get key
+                KEY=$(echo "$2" | cut -d' ' -f2)
+                if [[ -f "$DATA_STORE/${KEY}.key" ]]; then
+                    echo "\`$KEY' is \`$(cat "$DATA_STORE/${KEY}.key")'"
+                else
+                    echo "\`$KEY' not found"
+                fi
+                ;;
+            clear\ *)
+                # Parse clear command: clear key
+                KEY=$(echo "$2" | cut -d' ' -f2)
+                if [[ -f "$DATA_STORE/${KEY}.key" ]]; then
+                    rm "$DATA_STORE/${KEY}.key"
+                    echo "Committed ($(date +%s))"
+                else
+                    echo "\`$KEY' not found"
+                fi
+                ;;
+            getrange\ *)
+                # Parse getrange command: getrange start_key end_key
+                START_KEY=$(echo "$2" | cut -d' ' -f2)
+                END_KEY=$(echo "$2" | cut -d' ' -f3)
+                echo "Range [$START_KEY,$END_KEY):"
+                for file in "$DATA_STORE"/*.key; do
+                    if [[ -f "$file" ]]; then
+                        KEY=$(basename "$file" .key)
+                        if [[ "$KEY" > "$START_KEY" || "$KEY" == "$START_KEY" ]] && [[ "$KEY" < "$END_KEY" ]]; then
+                            echo "\`$KEY' is \`$(cat "$file")'"
+                        fi
+                    fi
+                done
+                ;;
+            *)
+                echo "Executed: $2"
+                ;;
+        esac
+        ;;
+    *)
+        echo "FoundationDB CLI Mock - Available for testing"
+        echo "Usage: fdbcli --exec '<command>'"
+        echo "Commands:"
+        echo "  status                     - Show database status"
+        echo "  writemode on              - Enable write mode"
+        echo "  set <key> <value>         - Set a key-value pair"
+        echo "  get <key>                 - Get value for a key"
+        echo "  clear <key>               - Delete a key"
+        echo "  getrange <start> <end>    - Get range of keys"
+        ;;
+esac

@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ultra-cpp
+  labels:
+    name: ultra-cpp
+    tier: performance-critical
+    monitoring: enabled
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: ultra-cpp-quota
+  namespace: ultra-cpp
+spec:
+  hard:
+    requests.cpu: "32"
+    requests.memory: 64Gi
+    requests.hugepages-2Mi: 16Gi
+    limits.cpu: "64"
+    limits.memory: 128Gi
+    limits.hugepages-2Mi: 32Gi
+    pods: "20"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: ultra-cpp-limits
+  namespace: ultra-cpp
+spec:
+  limits:
+  - default:
+      cpu: "4"
+      memory: "8Gi"
+      hugepages-2Mi: "2Gi"
+    defaultRequest:
+      cpu: "2"
+      memory: "4Gi"
+      hugepages-2Mi: "1Gi"
+    type: Container

@@ -1,0 +1,169 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: success-rate
+  namespace: production
+spec:
+  args:
+  - name: service-name
+  - name: namespace
+  
+  metrics:
+  - name: success-rate
+    interval: 30s
+    count: 10
+    successCondition: result[0] >= 0.99
+    failureCondition: result[0] < 0.95
+    provider:
+      prometheus:
+        address: http://prometheus.observability.svc.cluster.local:9090
+        query: |
+          sum(rate(http_requests_total{job="{{args.service-name}}", namespace="{{args.namespace}}", code!~"5.."}[2m])) /
+          sum(rate(http_requests_total{job="{{args.service-name}}", namespace="{{args.namespace}}"}[2m]))
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: latency-p99
+  namespace: production
+spec:
+  args:
+  - name: service-name
+  - name: namespace
+  
+  metrics:
+  - name: latency-p99
+    interval: 30s
+    count: 10
+    successCondition: result[0] <= 200
+    failureCondition: result[0] > 500
+    provider:
+      prometheus:
+        address: http://prometheus.observability.svc.cluster.local:9090
+        query: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket{job="{{args.service-name}}", namespace="{{args.namespace}}"}[2m])) by (le)
+          ) * 1000
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: error-rate
+  namespace: production
+spec:
+  args:
+  - name: service-name
+  - name: namespace
+  
+  metrics:
+  - name: error-rate
+    interval: 30s
+    count: 10
+    successCondition: result[0] <= 0.01
+    failureCondition: result[0] > 0.05
+    provider:
+      prometheus:
+        address: http://prometheus.observability.svc.cluster.local:9090
+        query: |
+          sum(rate(http_requests_total{job="{{args.service-name}}", namespace="{{args.namespace}}", code=~"5.."}[2m])) /
+          sum(rate(http_requests_total{job="{{args.service-name}}", namespace="{{args.namespace}}"}[2m]))
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: cpu-usage
+  namespace: production
+spec:
+  args:
+  - name: service-name
+  - name: namespace
+  
+  metrics:
+  - name: cpu-usage
+    interval: 30s
+    count: 10
+    successCondition: result[0] <= 0.8
+    failureCondition: result[0] > 0.95
+    provider:
+      prometheus:
+        address: http://prometheus.observability.svc.cluster.local:9090
+        query: |
+          avg(rate(container_cpu_usage_seconds_total{pod=~"{{args.service-name}}-.*", namespace="{{args.namespace}}"}[2m])) /
+          avg(container_spec_cpu_quota{pod=~"{{args.service-name}}-.*", namespace="{{args.namespace}}"} / 
+              container_spec_cpu_period{pod=~"{{args.service-name}}-.*", namespace="{{args.namespace}}"})
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: memory-usage
+  namespace: production
+spec:
+  args:
+  - name: service-name
+  - name: namespace
+  
+  metrics:
+  - name: memory-usage
+    interval: 30s
+    count: 10
+    successCondition: result[0] <= 0.8
+    failureCondition: result[0] > 0.95
+    provider:
+      prometheus:
+        address: http://prometheus.observability.svc.cluster.local:9090
+        query: |
+          avg(container_memory_working_set_bytes{pod=~"{{args.service-name}}-.*", namespace="{{args.namespace}}"}) /
+          avg(container_spec_memory_limit_bytes{pod=~"{{args.service-name}}-.*", namespace="{{args.namespace}}"})
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: comprehensive-analysis
+  namespace: production
+spec:
+  args:
+  - name: service-name
+  - name: namespace
+  
+  metrics:
+  - name: success-rate
+    interval: 30s
+    count: 10
+    successCondition: result[0] >= 0.99
+    failureCondition: result[0] < 0.95
+    provider:
+      prometheus:
+        address: http://prometheus.observability.svc.cluster.local:9090
+        query: |
+          sum(rate(http_requests_total{job="{{args.service-name}}", namespace="{{args.namespace}}", code!~"5.."}[2m])) /
+          sum(rate(http_requests_total{job="{{args.service-name}}", namespace="{{args.namespace}}"}[2m]))
+  
+  - name: latency-p99
+    interval: 30s
+    count: 10
+    successCondition: result[0] <= 200
+    failureCondition: result[0] > 500
+    provider:
+      prometheus:
+        address: http://prometheus.observability.svc.cluster.local:9090
+        query: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket{job="{{args.service-name}}", namespace="{{args.namespace}}"}[2m])) by (le)
+          ) * 1000
+  
+  - name: error-rate
+    interval: 30s
+    count: 10
+    successCondition: result[0] <= 0.01
+    failureCondition: result[0] > 0.05
+    provider:
+      prometheus:
+        address: http://prometheus.observability.svc.cluster.local:9090
+        query: |
+          sum(rate(http_requests_total{job="{{args.service-name}}", namespace="{{args.namespace}}", code=~"5.."}[2m])) /
+          sum(rate(http_requests_total{job="{{args.service-name}}", namespace="{{args.namespace}}"}[2m]))

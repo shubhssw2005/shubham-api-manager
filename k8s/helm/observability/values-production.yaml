@@ -1,0 +1,152 @@
+# Production Observability Configuration
+global:
+  environment: production
+  domain: "observability.yourdomain.com"
+  storageClass: "gp3"
+
+# Prometheus Production Configuration
+prometheus:
+  prometheusSpec:
+    retention: 90d
+    retentionSize: "200GB"
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 500Gi
+    
+    resources:
+      requests:
+        memory: "8Gi"
+        cpu: "4000m"
+      limits:
+        memory: "16Gi"
+        cpu: "8000m"
+    
+    # High availability
+    replicas: 2
+    
+    # External labels for federation
+    externalLabels:
+      cluster: "production"
+      region: "us-east-1"
+
+  # Alertmanager HA configuration
+  alertmanager:
+    alertmanagerSpec:
+      replicas: 3
+      storage:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: gp3
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 50Gi
+      
+      resources:
+        requests:
+          memory: "512Mi"
+          cpu: "200m"
+        limits:
+          memory: "1Gi"
+          cpu: "500m"
+
+# Grafana Production Configuration
+grafana:
+  # Use external secret for admin password
+  admin:
+    existingSecret: "grafana-admin-secret"
+    userKey: username
+    passwordKey: password
+  
+  # High availability
+  replicas: 2
+  
+  # Persistence
+  persistence:
+    size: 50Gi
+  
+  # Resources
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "200m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+  
+  # External database for HA
+  database:
+    type: postgres
+    host: "grafana-db.cluster-xxx.us-east-1.rds.amazonaws.com"
+    name: grafana
+    user: grafana
+    passwordSecret: "grafana-db-secret"
+    passwordKey: "password"
+  
+  # Ingress configuration
+  ingress:
+    enabled: true
+    ingressClassName: "nginx"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    hosts:
+      - observability.yourdomain.com
+    tls:
+      - secretName: grafana-tls
+        hosts:
+          - observability.yourdomain.com
+
+# Jaeger Production Configuration
+jaeger:
+  # Disable all-in-one for production
+  allInOne:
+    enabled: false
+  
+  # Enable distributed components
+  collector:
+    enabled: true
+    replicaCount: 3
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "200m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+  
+  query:
+    enabled: true
+    replicaCount: 2
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "200m"
+    
+    ingress:
+      enabled: true
+      ingressClassName: "nginx"
+      annotations:
+        cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      hosts:
+        - jaeger.yourdomain.com
+      tls:
+        - secretName: jaeger-tls
+          hosts:
+            - jaeger.yourdomain.com
+  
+  # Use Elasticsearch for storage
+  storage:
+    type: elasticsearch
+    elasticsearch:
+      host: "elasticsearch.observability.svc.cluster.local"
+      port: 9200
+      scheme: http

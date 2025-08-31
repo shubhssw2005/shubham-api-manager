@@ -1,0 +1,139 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: api-service-vs
+  namespace: production
+spec:
+  hosts:
+  - api-service
+  http:
+  - name: primary
+    match:
+    - headers:
+        end-user:
+          exact: canary
+    route:
+    - destination:
+        host: api-service
+        subset: canary
+      weight: 100
+  - name: default
+    route:
+    - destination:
+        host: api-service
+        subset: stable
+      weight: 100
+    - destination:
+        host: api-service
+        subset: canary
+      weight: 0
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: api-service-dr
+  namespace: production
+spec:
+  host: api-service
+  subsets:
+  - name: stable
+    labels:
+      app: api-service
+      version: stable
+    trafficPolicy:
+      connectionPool:
+        tcp:
+          maxConnections: 100
+        http:
+          http1MaxPendingRequests: 50
+          http2MaxRequests: 100
+          maxRequestsPerConnection: 10
+          maxRetries: 3
+          consecutiveGatewayErrors: 5
+          interval: 30s
+          baseEjectionTime: 30s
+      outlierDetection:
+        consecutiveGatewayErrors: 5
+        interval: 30s
+        baseEjectionTime: 30s
+        maxEjectionPercent: 50
+        minHealthPercent: 30
+  - name: canary
+    labels:
+      app: api-service
+      version: canary
+    trafficPolicy:
+      connectionPool:
+        tcp:
+          maxConnections: 100
+        http:
+          http1MaxPendingRequests: 50
+          http2MaxRequests: 100
+          maxRequestsPerConnection: 10
+          maxRetries: 3
+      outlierDetection:
+        consecutiveGatewayErrors: 3  # More strict for canary
+        interval: 15s
+        baseEjectionTime: 30s
+        maxEjectionPercent: 50
+        minHealthPercent: 50
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: api-gateway
+  namespace: production
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - api.example.com
+    tls:
+      httpsRedirect: true
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: api-tls-secret
+    hosts:
+    - api.example.com
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: api-gateway-vs
+  namespace: production
+spec:
+  hosts:
+  - api.example.com
+  gateways:
+  - api-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /api/
+    route:
+    - destination:
+        host: api-service
+        port:
+          number: 3000
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+      retryOn: gateway-error,connect-failure,refused-stream
+    fault:
+      delay:
+        percentage:
+          value: 0.1
+        fixedDelay: 5s

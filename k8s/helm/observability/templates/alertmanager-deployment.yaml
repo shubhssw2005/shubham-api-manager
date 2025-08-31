@@ -1,0 +1,215 @@
+{{- if .Values.prometheus.alertmanager.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: alertmanager
+    release: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.prometheus.alertmanager.alertmanagerSpec.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: alertmanager
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+    spec:
+      serviceAccountName: alertmanager
+      securityContext:
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+      containers:
+        - name: alertmanager
+          image: prom/alertmanager:v0.26.0
+          args:
+            - '--config.file=/etc/alertmanager/alertmanager.yml'
+            - '--storage.path=/alertmanager'
+            - '--web.external-url=http://{{ .Values.global.domain }}/alertmanager'
+            - '--cluster.listen-address=0.0.0.0:9094'
+            {{- if gt (.Values.prometheus.alertmanager.alertmanagerSpec.replicas | default 1 | int) 1 }}
+            - '--cluster.peer=alertmanager-0.alertmanager:9094'
+            - '--cluster.peer=alertmanager-1.alertmanager:9094'
+            - '--cluster.peer=alertmanager-2.alertmanager:9094'
+            {{- end }}
+          ports:
+            - containerPort: 9093
+              name: http
+            - containerPort: 9094
+              name: cluster
+          resources:
+            {{- toYaml .Values.prometheus.alertmanager.alertmanagerSpec.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alertmanager
+            - name: storage
+              mountPath: /alertmanager
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: 9093
+            initialDelaySeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: 9093
+            initialDelaySeconds: 5
+            timeoutSeconds: 5
+      volumes:
+        - name: config
+          configMap:
+            name: alertmanager-config
+        - name: storage
+          {{- if .Values.prometheus.alertmanager.alertmanagerSpec.storage }}
+          persistentVolumeClaim:
+            claimName: alertmanager-storage
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+---
+{{- if .Values.prometheus.alertmanager.alertmanagerSpec.storage }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: alertmanager-storage
+  namespace: {{ .Release.Namespace }}
+spec:
+  {{- toYaml .Values.prometheus.alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec | nindent 2 }}
+{{- end }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: alertmanager
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: alertmanager
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9093
+      targetPort: 9093
+      name: http
+    - port: 9094
+      targetPort: 9094
+      name: cluster
+  selector:
+    app: alertmanager
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: alertmanager
+data:
+  alertmanager.yml: |
+    global:
+      smtp_smarthost: 'localhost:587'
+      smtp_from: 'alertmanager@{{ .Values.global.domain }}'
+      resolve_timeout: 5m
+
+    templates:
+      - '/etc/alertmanager/templates/*.tmpl'
+
+    route:
+      group_by: ['alertname', 'cluster', 'service']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 1h
+      receiver: 'web.hook'
+      routes:
+        - match:
+            severity: critical
+          receiver: 'critical-alerts'
+          group_wait: 5s
+          repeat_interval: 30m
+        - match:
+            severity: warning
+          receiver: 'warning-alerts'
+          group_wait: 30s
+          repeat_interval: 2h
+        - match:
+            service: api-service
+          receiver: 'api-service-alerts'
+        - match:
+            service: media-service
+          receiver: 'media-service-alerts'
+
+    receivers:
+      - name: 'web.hook'
+        webhook_configs:
+          - url: 'http://webhook-service:5000/alerts'
+            send_resolved: true
+
+      - name: 'critical-alerts'
+        slack_configs:
+          - api_url: '{{ .Values.alertmanager.slack.apiUrl }}'
+            channel: '#critical-alerts'
+            title: 'Critical Alert - {{ .Values.global.environment }}'
+            text: |
+              {{ range .Alerts }}
+              *Alert:* {{ .Annotations.summary }}
+              *Description:* {{ .Annotations.description }}
+              *Severity:* {{ .Labels.severity }}
+              *Service:* {{ .Labels.service }}
+              {{ end }}
+        pagerduty_configs:
+          - routing_key: '{{ .Values.alertmanager.pagerduty.routingKey }}'
+            description: '{{ .GroupLabels.alertname }} - {{ .GroupLabels.service }}'
+
+      - name: 'warning-alerts'
+        slack_configs:
+          - api_url: '{{ .Values.alertmanager.slack.apiUrl }}'
+            channel: '#alerts'
+            title: 'Warning Alert - {{ .Values.global.environment }}'
+            text: |
+              {{ range .Alerts }}
+              *Alert:* {{ .Annotations.summary }}
+              *Description:* {{ .Annotations.description }}
+              *Severity:* {{ .Labels.severity }}
+              *Service:* {{ .Labels.service }}
+              {{ end }}
+
+      - name: 'api-service-alerts'
+        slack_configs:
+          - api_url: '{{ .Values.alertmanager.slack.apiUrl }}'
+            channel: '#api-alerts'
+            title: 'API Service Alert - {{ .Values.global.environment }}'
+            text: |
+              {{ range .Alerts }}
+              *Alert:* {{ .Annotations.summary }}
+              *Description:* {{ .Annotations.description }}
+              *Runbook:* {{ .Annotations.runbook_url }}
+              {{ end }}
+
+      - name: 'media-service-alerts'
+        slack_configs:
+          - api_url: '{{ .Values.alertmanager.slack.apiUrl }}'
+            channel: '#media-alerts'
+            title: 'Media Service Alert - {{ .Values.global.environment }}'
+            text: |
+              {{ range .Alerts }}
+              *Alert:* {{ .Annotations.summary }}
+              *Description:* {{ .Annotations.description }}
+              *Runbook:* {{ .Annotations.runbook_url }}
+              {{ end }}
+
+    inhibit_rules:
+      - source_match:
+          severity: 'critical'
+        target_match:
+          severity: 'warning'
+        equal: ['alertname', 'cluster', 'service']
+{{- end }}

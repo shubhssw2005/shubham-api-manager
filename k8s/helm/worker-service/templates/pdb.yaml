@@ -1,0 +1,31 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "worker-service.fullname" . }}-media-processor
+  labels:
+    {{- include "worker-service.labels" . | nindent 4 }}
+    app.kubernetes.io/component: media-processor
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "worker-service.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: media-processor
+---
+{{- if .Values.workers.outbox-processor.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "worker-service.fullname" . }}-outbox-processor
+  labels:
+    {{- include "worker-service.labels" . | nindent 4 }}
+    app.kubernetes.io/component: outbox-processor
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "worker-service.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: outbox-processor
+{{- end }}
+{{- end }}
